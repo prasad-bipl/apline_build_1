@@ -19,51 +19,61 @@ jobs:
     - name: Log in to GitHub Container Registry
       run: echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
-    - name: Get the latest tag
-      id: get_tag
+    # Get the current version from the VERSION file
+    - name: Get current version
+      id: get_version
       run: |
-        # Fetch tags and extract the latest tag
-        git fetch --tags
-        TAG=$(git describe --tags $(git rev-list --tags --max-count=1) 2>/dev/null || echo "v0.0.0")
-        echo "Latest tag: $TAG"
-        echo "::set-output name=latest_tag::$TAG"
+        VERSION=$(cat VERSION)
+        echo "Current version: $VERSION"
+        echo "::set-output name=version::$VERSION"
 
-    - name: Increment the version tag
-      id: increment_tag
+    # Increment the version (patch version bump)
+    - name: Increment version
+      id: increment_version
       run: |
-        LATEST_TAG=${{ steps.get_tag.outputs.latest_tag }}
-        echo "Latest tag is: $LATEST_TAG"
-        
-        # Parse the latest version and increment the patch number
-        VERSION="${LATEST_TAG//v/}"
-        IFS='.' read -r -a VERSION_PARTS <<< "$VERSION"
-        PATCH_VERSION=$((VERSION_PARTS[2]+1))
-        NEW_TAG="v${VERSION_PARTS[0]}.${VERSION_PARTS[1]}.$PATCH_VERSION"
-        echo "New tag will be: $NEW_TAG"
-        echo "::set-output name=new_tag::$NEW_TAG"
+        VERSION=${{ steps.get_version.outputs.version }}
+        echo "Current version is: $VERSION"
 
-    - name: Build Docker Image
-      run: |
-        NEW_TAG=${{ steps.increment_tag.outputs.new_tag }}
-        docker build --tag ghcr.io/${{ github.repository }}/alpine-nmap-python:$NEW_TAG .
+        # Split the version into major, minor, and patch
+        IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
+        PATCH=$((PATCH+1))  # Increment the patch version
 
-    - name: Push Docker Image to GitHub Container Registry
-      run: |
-        NEW_TAG=${{ steps.increment_tag.outputs.new_tag }}
-        docker push ghcr.io/${{ github.repository }}/alpine-nmap-python:$NEW_TAG
+        # Combine new version
+        NEW_VERSION="$MAJOR.$MINOR.$PATCH"
+        echo "New version: $NEW_VERSION"
+        echo "$NEW_VERSION" > VERSION  # Update the VERSION file
+        echo "::set-output name=new_version::$NEW_VERSION"
 
-    - name: Configure Git
+    # Commit the new version to the repository
+    - name: Commit new version
       run: |
         git config --global user.name "GitHub Actions"
         git config --global user.email "actions@github.com"
-
-    - name: Push the new tag to the repo using GHCR_PAT
-      run: |
-        NEW_TAG=${{ steps.increment_tag.outputs.new_tag }}
-        git tag $NEW_TAG
-        git push origin $NEW_TAG
+        git add VERSION
+        git commit -m "Bump version to ${{ steps.increment_version.outputs.new_version }}"
+        git push origin main
       env:
-        GITHUB_PAT: ${{ secrets.GHCR_PAT }}  # Use GHCR_PAT to push tags
+        GHCR_PAT: ${{ secrets.GHCR_PAT }}
+
+    # Build Docker Image with the new version
+    - name: Build Docker Image
+      run: |
+        NEW_VERSION=${{ steps.increment_version.outputs.new_version }}
+        docker build --tag ghcr.io/${{ github.repository }}/alpine-nmap-python:$NEW_VERSION .
+
+    - name: Push Docker Image to GitHub Container Registry
+      run: |
+        NEW_VERSION=${{ steps.increment_version.outputs.new_version }}
+        docker push ghcr.io/${{ github.repository }}/alpine-nmap-python:$NEW_VERSION
+
+    # Push the new tag to the repo
+    - name: Tag new version and push
+      run: |
+        NEW_VERSION=${{ steps.increment_version.outputs.new_version }}
+        git tag $NEW_VERSION
+        git push origin $NEW_VERSION
+      env:
+        GHCR_PAT: ${{ secrets.GHCR_PAT }}
 
   release:
     needs: build
@@ -73,13 +83,13 @@ jobs:
     - name: Checkout Repository
       uses: actions/checkout@v4
 
-    - name: Create Release using GHCR_PAT
+    # Create a GitHub release for the new version
+    - name: Create Release
       uses: actions/create-release@v1
       env:
-        GITHUB_TOKEN: ${{ secrets.GHCR_PAT }}  # Use GHCR_PAT for creating the release
+        GITHUB_TOKEN: ${{ secrets.GHCR_PAT }}
       with:
-        tag_name: ${{ steps.increment_tag.outputs.new_tag }}
-        release_name: Release ${{ steps.increment_tag.outputs.new_tag }}
+        tag_name: ${{ steps.increment_version.outputs.new_version }}
+        release_name: Release ${{ steps.increment_version.outputs.new_version }}
         draft: false
         prerelease: false
-#done
