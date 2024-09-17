@@ -15,10 +15,15 @@ RUN apk update && \
     openssl-dev \
     musl-dev \
     gcc \
-    libc-dev
+    libc-dev \
+    py3-virtualenv
 
-# Install the required Python packages via pip without upgrading pip
-RUN pip3 install \
+# Create a virtual environment for Python packages
+RUN python3 -m venv /opt/venv
+
+# Activate the virtual environment and install required Python packages
+RUN /opt/venv/bin/pip install --upgrade pip && \
+    /opt/venv/bin/pip install \
     blinker==1.8.2 \
     click==8.1.7 \
     Flask==3.0.3 \
@@ -27,7 +32,10 @@ RUN pip3 install \
     MarkupSafe==2.1.5 \
     Werkzeug==3.0.4
 
-# Clean up build dependencies to reduce the image size
+# Add the virtual environment's bin directory to PATH
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Clean up build dependencies to reduce image size
 RUN apk del build-base gcc musl-dev libc-dev
 
 # Set the default command to run an interactive shell when the container starts
