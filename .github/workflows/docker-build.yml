@@ -44,11 +44,12 @@ jobs:
         echo "$NEW_VERSION" > VERSION  # Update the VERSION file
         echo "::set-output name=new_version::$NEW_VERSION"
 
-    # Commit the new version to the repository
+    # Commit the new version to the repository using GHCR_PAT
     - name: Commit new version
       run: |
         git config --global user.name "GitHub Actions"
         git config --global user.email "actions@github.com"
+        git remote set-url origin https://$GHCR_PAT@github.com/${{ github.repository }}.git
         git add VERSION
         git commit -m "Bump version to ${{ steps.increment_version.outputs.new_version }}"
         git push origin main
@@ -66,7 +67,7 @@ jobs:
         NEW_VERSION=${{ steps.increment_version.outputs.new_version }}
         docker push ghcr.io/${{ github.repository }}/alpine-nmap-python:$NEW_VERSION
 
-    # Push the new tag to the repo
+    # Push the new tag to the repo using GHCR_PAT
     - name: Tag new version and push
       run: |
         NEW_VERSION=${{ steps.increment_version.outputs.new_version }}
@@ -87,7 +88,7 @@ jobs:
     - name: Create Release
       uses: actions/create-release@v1
       env:
-        GITHUB_TOKEN: ${{ secrets.GHCR_PAT }}
+        GITHUB_TOKEN: ${{ secrets.GHCR_PAT }}  # Use GHCR_PAT for creating the release
       with:
         tag_name: ${{ steps.increment_version.outputs.new_version }}
         release_name: Release ${{ steps.increment_version.outputs.new_version }}
