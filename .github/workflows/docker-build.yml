@@ -1,15 +1,9 @@
-name: Build and Release Alpine Docker Image
+name: Build, Tag, and Release Docker Image
 
 on:
   push:
     branches:
       - main
-  workflow_dispatch:
-    inputs:
-      version:
-        description: 'Image version'
-        required: true
-        default: 'latest'
 
 jobs:
   build:
@@ -17,32 +11,56 @@ jobs:
 
     steps:
     - name: Checkout Repository
-      uses: actions/checkout@v4 # Updated to v4 for Node.js 20 compatibility
+      uses: actions/checkout@v4
 
     - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3 # Updated to v3 for Node.js 20 compatibility
+      uses: docker/setup-buildx-action@v3
 
     - name: Log in to GitHub Container Registry
       run: echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
+    - name: Get the latest tag
+      id: get_tag
+      run: |
+        # Fetch tags and extract the latest tag
+        git fetch --tags
+        TAG=$(git describe --tags $(git rev-list --tags --max-count=1) 2>/dev/null || echo "v0.0.0")
+        echo "Latest tag: $TAG"
+        echo "::set-output name=latest_tag::$TAG"
+
+    - name: Increment the version tag
+      id: increment_tag
+      run: |
+        LATEST_TAG=${{ steps.get_tag.outputs.latest_tag }}
+        echo "Latest tag is: $LATEST_TAG"
+        
+        # Parse the latest version and increment the patch number
+        VERSION="${LATEST_TAG//v/}"
+        IFS='.' read -r -a VERSION_PARTS <<< "$VERSION"
+        PATCH_VERSION=$((VERSION_PARTS[2]+1))
+        NEW_TAG="v${VERSION_PARTS[0]}.${VERSION_PARTS[1]}.$PATCH_VERSION"
+        echo "New tag will be: $NEW_TAG"
+        echo "::set-output name=new_tag::$NEW_TAG"
+
     - name: Build Docker Image
       run: |
-        # Use 'latest' if no version is provided
-        VERSION=${{ github.event.inputs.version || 'latest' }}
-        # Build and tag the Docker image with the given version or 'latest'
-        docker build --tag ghcr.io/${{ github.repository }}/alpine-nmap-python:$VERSION .
+        NEW_TAG=${{ steps.increment_tag.outputs.new_tag }}
+        docker build --tag ghcr.io/${{ github.repository }}/alpine-nmap-python:$NEW_TAG .
 
     - name: Push Docker Image to GitHub Container Registry
       run: |
-        # Use 'latest' if no version is provided
-        VERSION=${{ github.event.inputs.version || 'latest' }}
-        # Push the Docker image with the given version or 'latest'
-        docker push ghcr.io/${{ github.repository }}/alpine-nmap-python:$VERSION
+        NEW_TAG=${{ steps.increment_tag.outputs.new_tag }}
+        docker push ghcr.io/${{ github.repository }}/alpine-nmap-python:$NEW_TAG
+
+    - name: Push the new tag to the repo
+      run: |
+        NEW_TAG=${{ steps.increment_tag.outputs.new_tag }}
+        git tag $NEW_TAG
+        git push origin $NEW_TAG
 
   release:
     needs: build
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
 
     steps:
     - name: Checkout Repository
@@ -53,11 +71,7 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        tag_name: ${{ github.event.inputs.version }}
-        release_name: Release ${{ github.event.inputs.version }}
+        tag_name: ${{ steps.increment_tag.outputs.new_tag }}
+        release_name: Release ${{ steps.increment_tag.outputs.new_tag }}
         draft: false
         prerelease: false
-
-    - name: Upload Release Assets
-      run: |
-        echo "Release ${{ github.event.inputs.version }} published!"
