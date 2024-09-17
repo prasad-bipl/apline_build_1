@@ -52,11 +52,18 @@ jobs:
         NEW_TAG=${{ steps.increment_tag.outputs.new_tag }}
         docker push ghcr.io/${{ github.repository }}/alpine-nmap-python:$NEW_TAG
 
-    - name: Push the new tag to the repo
+    - name: Configure Git
+      run: |
+        git config --global user.name "GitHub Actions"
+        git config --global user.email "actions@github.com"
+
+    - name: Push the new tag to the repo using GHCR_PAT
       run: |
         NEW_TAG=${{ steps.increment_tag.outputs.new_tag }}
         git tag $NEW_TAG
         git push origin $NEW_TAG
+      env:
+        GITHUB_PAT: ${{ secrets.GHCR_PAT }}  # Use GHCR_PAT to push tags
 
   release:
     needs: build
@@ -66,10 +73,10 @@ jobs:
     - name: Checkout Repository
       uses: actions/checkout@v4
 
-    - name: Create Release
+    - name: Create Release using GHCR_PAT
       uses: actions/create-release@v1
       env:
-        GITHUB_TOKEN: ${{ secrets.GHCR_PAT }}
+        GITHUB_TOKEN: ${{ secrets.GHCR_PAT }}  # Use GHCR_PAT for creating the release
       with:
         tag_name: ${{ steps.increment_tag.outputs.new_tag }}
         release_name: Release ${{ steps.increment_tag.outputs.new_tag }}
