@@ -17,10 +17,7 @@ RUN apk update && \
     gcc \
     libc-dev
 
-# Upgrade pip to the latest version
-RUN python3 -m pip install --upgrade pip
-
-# Install the required Python packages via pip
+# Install the required Python packages via pip without upgrading pip
 RUN pip3 install \
     blinker==1.8.2 \
     click==8.1.7 \
