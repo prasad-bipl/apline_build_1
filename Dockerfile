@@ -4,7 +4,7 @@ FROM alpine:latest
 # Set environment variables for Python
 ENV PYTHONUNBUFFERED=1
 
-# Update package manager, install required system packages and build dependencies
+# Update package manager, install required system packages and build dependencie1
 RUN apk update && \
     apk add --no-cache \
     python3 \
