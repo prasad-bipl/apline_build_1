@@ -90,7 +90,7 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GHCR_PAT }}  # Use GHCR_PAT for creating the release
       with:
-        tag_name: ${{ steps.increment_version.outputs.new_version }}  # Set the tag name
+        tag_name: ${{ steps.increment_version.outputs.new_version }}  # Explicitly pass the tag_name
         release_name: Release ${{ steps.increment_version.outputs.new_version }}
         draft: false
         prerelease: false
