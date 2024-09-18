@@ -73,23 +73,32 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y genisoimage
 
-    # Generate bootable .img and .iso files in the GitHub workspace directory
+    # Create a directory for the generated files and make it the working directory
+    - name: Create directory for bootable files
+      run: |
+        mkdir -p boot_files  # Create a new directory for the files
+        ls -l   # List the contents of the directory for verification
+
+    # Generate bootable .img and .iso files in the created boot_files directory
     - name: Create Bootable .img and .iso Files
       run: |
-        # Create bootable image file (.img) in the workspace directory
-        dd if=/dev/zero of=$GITHUB_WORKSPACE/bootable_image.img bs=1M count=1024
-        mkfs.ext4 $GITHUB_WORKSPACE/bootable_image.img  # Format as ext4, customize as needed
+        # Navigate to the boot_files directory
+        cd boot_files
 
-        # Create bootable ISO file (.iso) in the workspace directory
+        # Create bootable image file (.img) in the boot_files directory
+        dd if=/dev/zero of=bootable_image.img bs=1M count=1024
+        mkfs.ext4 bootable_image.img  # Format as ext4, customize as needed
+
+        # Create bootable ISO file (.iso) in the boot_files directory
         mkdir iso_dir
-        genisoimage -o $GITHUB_WORKSPACE/bootable_image.iso -J -R -V "BOOTABLE_ISO" iso_dir
+        genisoimage -o bootable_image.iso -J -R -V "BOOTABLE_ISO" iso_dir
 
     # Save the generated files as outputs for later use
     - name: Set output for bootable files
       id: boot_files
       run: |
-        echo "::set-output name=img_file::$GITHUB_WORKSPACE/bootable_image.img"
-        echo "::set-output name=iso_file::$GITHUB_WORKSPACE/bootable_image.iso"
+        echo "::set-output name=img_file::boot_files/bootable_image.img"
+        echo "::set-output name=iso_file::boot_files/bootable_image.iso"
 
     # Push the new tag to the repo using GHCR_PAT
     - name: Tag new version and push
@@ -131,7 +140,7 @@ jobs:
       uses: actions/upload-release-asset@v1
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ${{ needs.build.outputs.img_file }}  # Full path from workspace
+        asset_path: ${{ needs.build.outputs.img_file }}  # Full path to the bootable_image.img file
         asset_name: bootable_image_${{ needs.build.outputs.new_version }}.img
         asset_content_type: application/octet-stream
 
@@ -140,6 +149,6 @@ jobs:
       uses: actions/upload-release-asset@v1
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ${{ needs.build.outputs.iso_file }}  # Full path from workspace
+        asset_path: ${{ needs.build.outputs.iso_file }}  # Full path to the bootable_image.iso file
         asset_name: bootable_image_${{ needs.build.outputs.new_version }}.iso
         asset_content_type: application/octet-stream
