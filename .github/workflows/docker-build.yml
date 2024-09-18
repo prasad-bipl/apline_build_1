@@ -114,8 +114,9 @@ jobs:
     - name: Checkout Repository
       uses: actions/checkout@v4
 
-    # Create a GitHub release for the new version
+    # Create a GitHub release for the new version and capture the upload URL
     - name: Create Release
+      id: create_release  # Add an ID to capture outputs
       uses: actions/create-release@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GHCR_PAT }}  # Use GHCR_PAT for creating the release
@@ -129,7 +130,7 @@ jobs:
     - name: Upload Bootable .img File
       uses: actions/upload-release-asset@v1
       with:
-        upload_url: ${{ steps.create-release.outputs.upload_url }}
+        upload_url: ${{ steps.create_release.outputs.upload_url }}  # Capture the upload URL
         asset_path: ${{ needs.build.outputs.img_file }}
         asset_name: bootable_image_${{ needs.build.outputs.new_version }}.img
         asset_content_type: application/octet-stream
@@ -138,7 +139,7 @@ jobs:
     - name: Upload Bootable .iso File
       uses: actions/upload-release-asset@v1
       with:
-        upload_url: ${{ steps.create-release.outputs.upload_url }}
+        upload_url: ${{ steps.create_release.outputs.upload_url }}  # Capture the upload URL
         asset_path: ${{ needs.build.outputs.iso_file }}
         asset_name: bootable_image_${{ needs.build.outputs.new_version }}.iso
         asset_content_type: application/octet-stream
