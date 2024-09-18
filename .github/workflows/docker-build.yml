@@ -67,6 +67,12 @@ jobs:
         NEW_VERSION=${{ steps.increment_version.outputs.new_version }}
         docker push ghcr.io/${{ github.repository }}/alpine-nmap-python:$NEW_VERSION
 
+    # Install genisoimage for creating ISO files
+    - name: Install genisoimage
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y genisoimage
+
     # Generate bootable .img and .iso files
     - name: Create Bootable .img and .iso Files
       run: |
@@ -76,7 +82,7 @@ jobs:
 
         # Create bootable ISO file (.iso)
         mkdir iso_dir
-        mkisofs -o bootable_image.iso -J -R -V "BOOTABLE_ISO" iso_dir
+        genisoimage -o bootable_image.iso -J -R -V "BOOTABLE_ISO" iso_dir
 
     # Save the generated files as outputs for later use
     - name: Set output for bootable files
