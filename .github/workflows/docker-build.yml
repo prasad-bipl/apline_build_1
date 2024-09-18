@@ -76,6 +76,10 @@ jobs:
       env:
         GHCR_PAT: ${{ secrets.GHCR_PAT }}
 
+    # Output the new version for other jobs to use
+    outputs:
+      new_version: ${{ steps.increment_version.outputs.new_version }}
+
   release:
     needs: build
     runs-on: ubuntu-latest
@@ -90,7 +94,7 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GHCR_PAT }}  # Use GHCR_PAT for creating the release
       with:
-        tag_name: ${{ steps.increment_version.outputs.new_version }}  # Explicitly pass the tag_name
-        release_name: Release ${{ steps.increment_version.outputs.new_version }}
+        tag_name: ${{ needs.build.outputs.new_version }}  # Use the version output from the build job
+        release_name: Release ${{ needs.build.outputs.new_version }}
         draft: false
         prerelease: false
