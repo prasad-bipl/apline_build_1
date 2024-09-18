@@ -73,32 +73,31 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y genisoimage
 
-    # Create a directory for the generated files and make it the working directory
-    - name: Create directory for bootable files
-      run: |
-        mkdir -p boot_files  # Create a new directory for the files
-        ls -l   # List the contents of the directory for verification
-
-    # Generate bootable .img and .iso files in the created boot_files directory
+    # Generate bootable .img and .iso files in the $GITHUB_WORKSPACE directory
     - name: Create Bootable .img and .iso Files
       run: |
-        # Navigate to the boot_files directory
-        cd boot_files
+        # Ensure we're in the workspace directory
+        cd $GITHUB_WORKSPACE
 
-        # Create bootable image file (.img) in the boot_files directory
-        dd if=/dev/zero of=bootable_image.img bs=1M count=1024
-        mkfs.ext4 bootable_image.img  # Format as ext4, customize as needed
+        # Create bootable image file (.img)
+        dd if=/dev/zero of=$GITHUB_WORKSPACE/bootable_image.img bs=1M count=1024
+        mkfs.ext4 $GITHUB_WORKSPACE/bootable_image.img  # Format as ext4, customize as needed
 
-        # Create bootable ISO file (.iso) in the boot_files directory
-        mkdir iso_dir
-        genisoimage -o bootable_image.iso -J -R -V "BOOTABLE_ISO" iso_dir
+        # Create bootable ISO file (.iso)
+        mkdir $GITHUB_WORKSPACE/iso_dir
+        genisoimage -o $GITHUB_WORKSPACE/bootable_image.iso -J -R -V "BOOTABLE_ISO" $GITHUB_WORKSPACE/iso_dir
+
+    # List contents of the workspace for debugging
+    - name: List files for debugging
+      run: |
+        ls -la $GITHUB_WORKSPACE
 
     # Save the generated files as outputs for later use
     - name: Set output for bootable files
       id: boot_files
       run: |
-        echo "::set-output name=img_file::boot_files/bootable_image.img"
-        echo "::set-output name=iso_file::boot_files/bootable_image.iso"
+        echo "::set-output name=img_file::$GITHUB_WORKSPACE/bootable_image.img"
+        echo "::set-output name=iso_file::$GITHUB_WORKSPACE/bootable_image.iso"
 
     # Push the new tag to the repo using GHCR_PAT
     - name: Tag new version and push
