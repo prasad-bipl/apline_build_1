@@ -1,4 +1,4 @@
-name: Build, Tag, and Release Docker Image
+name: Build, Tag, and Release Bootable Images
 
 on:
   push:
@@ -67,6 +67,24 @@ jobs:
         NEW_VERSION=${{ steps.increment_version.outputs.new_version }}
         docker push ghcr.io/${{ github.repository }}/alpine-nmap-python:$NEW_VERSION
 
+    # Generate bootable .img and .iso files
+    - name: Create Bootable .img and .iso Files
+      run: |
+        # Create bootable image file (.img)
+        dd if=/dev/zero of=bootable_image.img bs=1M count=1024
+        mkfs.ext4 bootable_image.img  # Format as ext4, customize as needed
+
+        # Create bootable ISO file (.iso)
+        mkdir iso_dir
+        mkisofs -o bootable_image.iso -J -R -V "BOOTABLE_ISO" iso_dir
+
+    # Save the generated files as outputs for later use
+    - name: Set output for bootable files
+      id: boot_files
+      run: |
+        echo "::set-output name=img_file::bootable_image.img"
+        echo "::set-output name=iso_file::bootable_image.iso"
+
     # Push the new tag to the repo using GHCR_PAT
     - name: Tag new version and push
       run: |
@@ -79,6 +97,8 @@ jobs:
     # Output the new version for other jobs to use
     outputs:
       new_version: ${{ steps.increment_version.outputs.new_version }}
+      img_file: ${{ steps.boot_files.outputs.img_file }}
+      iso_file: ${{ steps.boot_files.outputs.iso_file }}
 
   release:
     needs: build
@@ -94,7 +114,25 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GHCR_PAT }}  # Use GHCR_PAT for creating the release
       with:
-        tag_name: ${{ needs.build.outputs.new_version }}  # Use the version output from the build job
+        tag_name: ${{ needs.build.outputs.new_version }}
         release_name: Release ${{ needs.build.outputs.new_version }}
         draft: false
         prerelease: false
+
+    # Upload bootable .img file as a release asset
+    - name: Upload Bootable .img File
+      uses: actions/upload-release-asset@v1
+      with:
+        upload_url: ${{ steps.create-release.outputs.upload_url }}
+        asset_path: ${{ needs.build.outputs.img_file }}
+        asset_name: bootable_image_${{ needs.build.outputs.new_version }}.img
+        asset_content_type: application/octet-stream
+
+    # Upload bootable .iso file as a release asset
+    - name: Upload Bootable .iso File
+      uses: actions/upload-release-asset@v1
+      with:
+        upload_url: ${{ steps.create-release.outputs.upload_url }}
+        asset_path: ${{ needs.build.outputs.iso_file }}
+        asset_name: bootable_image_${{ needs.build.outputs.new_version }}.iso
+        asset_content_type: application/octet-stream
